@@ -1,0 +1,95 @@
+---
+title: "Machine Learning Assignment"
+author: "Roy Hulli"
+date: "January 28, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Prep and Libraries
+
+In this assignment the first step was to load the libraries we’ll need: caret, randomforest and corrplot , set the active directory, and load the training and testing data from PLM, is loaded and stored as matrix variables to enable manipulation.
+
+```{r}
+
+setwd("C:/Users/Azamat/Documents/R/Machine Learning 4")
+TestA = read.csv("pml-testing.csv", na.strings = c("NA", "#DIV/0!", ""))
+TrainA = read.csv("pml-training.csv",na.strings = c("NA", "#DIV/0!", ""))
+
+library(caret)
+library(randomForest)
+library(corrplot)
+```
+
+## Data Cleaning
+Once loaded, the csv data itself contains some text fields, a date field, many NAs and columns that contain mainly blank values. Without removing these, the functions in R fail to perform, so some data cleaning is required. The first 6 columns  are removed. And the NAs are removed.
+
+
+```{r}
+#remove non numeric columns 
+TrainA <- TrainA[, -(1:6)]
+
+#clean NAs or mostly NA columns
+NAs    <- sapply(TrainA, function(x) mean(is.na(x))) > 0.95
+TrainA <- TrainA[, NAs==FALSE]
+
+```
+
+## Training and Testing
+With a cleaned Train Dataset, it is then partitioned into 2 sets (train and test) to enable cross validation. At this point a correlation matrix can be plotted to see whether some variables have a high degree of correlation with the others
+
+```{r}
+#seperate train and test set
+inTrain  <- createDataPartition(TrainA$classe, p=0.5, list=FALSE)
+TrainSet <- TrainA[inTrain, ]
+TestSet  <- TrainA[-inTrain, ]
+
+#plot correlation ofvariables
+corMatrix <- cor(TrainSet[, -54])
+corrplot(corMatrix, order = "FPC", method = "square", type = "upper",
+         add = FALSE, tl.cex = 0.5)
+
+```
+
+##Prediction Model
+Based on the course lectures and online research regarding Kaggle competitions, random forest consistently proves to be a highly accurate, though computationally intensive, approach to building prediction models. Thus for this assignment, a random forest approach was used to build the model. 
+
+```{r}
+#build a prediction model
+# model fit
+set.seed(150)
+controlRF <- trainControl(method="cv", number=3, verboseIter=FALSE)
+modFit <- train(classe ~ ., data=TrainSet, method="rf", trControl=controlRF, prox = TRUE)
+modFit$finalModel
+
+
+```
+
+##Cross Validation
+The train function in Caret handles cross validation. By separating the train data set into 2 equal sized half-sets, the accuracy of the model can be assessed. In this case, the random forest model yielded an accuracy of 99.46%, and a confusion matrix broken down by class type shows a relatively small proportional distribution of error.
+```{r}
+#prediction - cross validation
+predictRF <- predict(modFit, newdata=TestSet)
+confMatRF <- confusionMatrix(predictRF, TestSet$classe)
+confMatRF
+
+```
+
+##Accuracy
+
+Based on the results of the cross validation confusion matrix, which considered an equal quantity of new test data and training data, it is expected the out of sample error will be less than 1% for predictions based on new data. 
+
+
+
+##Predictions
+Based on the random forest modelling, the predictions of the classe of exercises for the test data are found.
+
+```{r}
+#prediction
+Testcases <- predict(modFit, newdata=TestA)
+Testcases
+```
+
